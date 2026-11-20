@@ -54,7 +54,8 @@ def void_file(file_id: int, db_path: str | None = None) -> dict:
         if row["status"] == "已合并":
             raise ServiceError("已合并文件不可作废", 409)
         conn.execute(
-            "UPDATE lake_files SET status='作废' WHERE id=?", (file_id,)
+            "UPDATE lake_files SET status='作废', reject_reason='' WHERE id=?",
+            (file_id,),
         )
         # drop from open plans
         conn.execute("DELETE FROM plan_items WHERE file_id=?", (file_id,))
@@ -69,7 +70,8 @@ def table_stats(db_path: str | None = None) -> list[dict]:
         rows = conn.execute(
             "SELECT table_name, COUNT(*) AS file_count, "
             "SUM(size_bytes) AS total_bytes, "
-            "SUM(CASE WHEN status='碎文件' THEN 1 ELSE 0 END) AS loose_count "
+            "SUM(CASE WHEN status='碎文件' THEN 1 ELSE 0 END) AS loose_count, "
+            "SUM(CASE WHEN status='已拒绝' THEN 1 ELSE 0 END) AS rejected_count "
             "FROM lake_files GROUP BY table_name ORDER BY table_name"
         ).fetchall()
         return [dict(r) for r in rows]

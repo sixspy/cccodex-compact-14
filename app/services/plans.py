@@ -11,8 +11,15 @@ def list_plans(db_path: str | None = None) -> list[dict]:
             "SELECT p.*, "
             "(SELECT COUNT(*) FROM plan_items i WHERE i.plan_id=p.id) AS item_count, "
             "(SELECT COALESCE(SUM(f.size_bytes),0) FROM plan_items i "
-            " JOIN lake_files f ON f.id=i.file_id WHERE i.plan_id=p.id) AS plan_bytes "
-            "FROM compact_plans p ORDER BY p.id"
+            " JOIN lake_files f ON f.id=i.file_id WHERE i.plan_id=p.id) AS plan_bytes, "
+            "(SELECT COUNT(*) FROM plan_items i JOIN lake_files f ON f.id=i.file_id "
+            " WHERE i.plan_id=p.id AND f.status='已拒绝') AS rejected_count, "
+            "g.status AS gate_status, g.threshold_kb AS gate_threshold_kb, "
+            "g.rejected_count AS gate_rejected_count, g.message AS gate_message, "
+            "g.created_at AS gate_checked_at, g.id AS gate_check_id "
+            "FROM compact_plans p LEFT JOIN gate_checks g ON g.id=("
+            "  SELECT id FROM gate_checks WHERE plan_id=p.id ORDER BY id DESC LIMIT 1"
+            ") ORDER BY p.id"
         ).fetchall()
         return [dict(r) for r in rows]
 
@@ -54,8 +61,9 @@ def attach_loose_files(plan_id: int, db_path: str | None = None) -> dict:
             raise ServiceError("计划不存在", 404)
         if plan["status"] not in ("草稿", "已发布"):
             raise ServiceError("当前计划状态不可挂文件", 409)
+        # 已拒绝件重新挂入，留给合并前闸检按现行阈值重新核验。
         loose = conn.execute(
-            "SELECT id FROM lake_files WHERE table_name=? AND status='碎文件'",
+            "SELECT id FROM lake_files WHERE table_name=? AND status IN ('碎文件','已拒绝')",
             (plan["target_table"],),
         ).fetchall()
         attached = 0
@@ -65,13 +73,18 @@ def attach_loose_files(plan_id: int, db_path: str | None = None) -> dict:
                 (plan_id, row["id"]),
             ).fetchone()
             if exists:
+                conn.execute(
+                    "UPDATE lake_files SET status='已入计划', reject_reason='' "
+                    "WHERE id=? AND status='已拒绝'",
+                    (row["id"],),
+                )
                 continue
             conn.execute(
                 "INSERT INTO plan_items(plan_id, file_id) VALUES (?,?)",
                 (plan_id, row["id"]),
             )
             conn.execute(
-                "UPDATE lake_files SET status='已入计划' WHERE id=?",
+                "UPDATE lake_files SET status='已入计划', reject_reason='' WHERE id=?",
                 (row["id"],),
             )
             attached += 1

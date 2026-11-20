@@ -10,7 +10,9 @@ CREATE TABLE IF NOT EXISTS lake_files (
   path TEXT NOT NULL UNIQUE,
   table_name TEXT NOT NULL,
   size_bytes INTEGER NOT NULL,
-  status TEXT NOT NULL CHECK (status IN ('碎文件','已入计划','已合并','作废')),
+  status TEXT NOT NULL CHECK (status IN ('碎文件','已入计划','已合并','已拒绝','作废')),
+  reject_reason TEXT NOT NULL DEFAULT '',
+  gate_check_id INTEGER,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -37,8 +39,23 @@ CREATE TABLE IF NOT EXISTS rewrite_jobs (
   status TEXT NOT NULL CHECK (status IN ('待执行','执行中','成功','失败')),
   merged_bytes INTEGER NOT NULL DEFAULT 0,
   message TEXT NOT NULL DEFAULT '',
+  gate_check_id INTEGER,
   started_at TEXT,
   finished_at TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS gate_checks (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  plan_id INTEGER NOT NULL REFERENCES compact_plans(id),
+  threshold_kb INTEGER NOT NULL DEFAULT 0,
+  status TEXT NOT NULL CHECK (status IN ('通过','拒绝')),
+  checked_count INTEGER NOT NULL DEFAULT 0,
+  rejected_count INTEGER NOT NULL DEFAULT 0,
+  rejected_ids TEXT NOT NULL DEFAULT '[]',
+  rejected_detail TEXT NOT NULL DEFAULT '[]',
+  fingerprint TEXT NOT NULL DEFAULT '',
+  message TEXT NOT NULL DEFAULT '',
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -65,12 +82,13 @@ CREATE TABLE IF NOT EXISTS meta (
 """
 
 
-def connect(db_path: str | None = None) -> sqlite3.Connection:
+def connect(db_path: str | None = None, timeout: float = 15.0) -> sqlite3.Connection:
     path = db_path or Config.database()
     Path(path).parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(path, check_same_thread=False)
+    conn = sqlite3.connect(path, timeout=timeout, check_same_thread=False)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
+    conn.execute(f"PRAGMA busy_timeout = {int(timeout * 1000)}")
     return conn
 
 
@@ -86,6 +104,37 @@ def get_db(db_path: str | None = None):
     finally:
         conn.close()
 
+
+@contextmanager
+def write_transaction(db_path: str | None = None, timeout: float = 15.0):
+    """显式 BEGIN IMMEDIATE 写事务。
+
+    合并启动时用它把「读阈值 → 核验碎件 → 落盘闸检 → 合并」收进单一写锁，
+    两个仓管同时点启动时不会双写闸检凭证，也不会互相覆盖。
+    """
+    path = db_path or Config.database()
+    Path(path).parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(
+        path, timeout=timeout, check_same_thread=False, isolation_level=None
+    )
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA foreign_keys = ON")
+    conn.execute(f"PRAGMA busy_timeout = {int(timeout * 1000)}")
+    try:
+        conn.execute("BEGIN IMMEDIATE")
+        yield conn
+    except BaseException as exc:
+        # 闸检拒绝属于“已落盘后报错”：调用方已显式 COMMIT，不能再回滚凭证。
+        if not getattr(exc, "committed", False):
+            try:
+                conn.execute("ROLLBACK")
+            except sqlite3.Error:
+                pass
+        raise
+    else:
+        conn.execute("COMMIT")
+    finally:
+        conn.close()
 
 def init_schema(db_path: str | None = None) -> None:
     with get_db(db_path) as conn:

@@ -3,6 +3,7 @@ from pathlib import Path
 import tornado.web
 
 from app.handlers.api_files import ApiFiles, ApiFileVoid
+from app.handlers.api_gate import ApiGateChecks
 from app.handlers.api_plans import (
     ApiPlanAttach,
     ApiPlanDetail,
@@ -43,6 +44,7 @@ def make_app() -> tornado.web.Application:
             (r"/api/plans/([0-9]+)/publish", ApiPlanPublish),
             (r"/api/rewrite/jobs", ApiRewriteJobs),
             (r"/api/rewrite/plans/([0-9]+)/start", ApiRewriteStart),
+            (r"/api/gate/checks", ApiGateChecks),
             (r"/api/reconcile/reports", ApiReconcileReports),
             (r"/api/settings", ApiSettings),
             (

@@ -4,7 +4,7 @@ from __future__ import annotations
 from app.db import SCHEMA, get_db, init_schema
 
 
-SCHEMA_VERSION = "compact-v2"
+SCHEMA_VERSION = "compact-v3"
 
 
 def _schema_compatible(conn) -> bool:
@@ -29,6 +29,7 @@ def seed_if_needed(db_path: str | None = None) -> dict:
         if not _schema_compatible(conn) or (ver and ver["value"] != SCHEMA_VERSION):
             for table in (
                 "volume_reports",
+                "gate_checks",
                 "rewrite_jobs",
                 "plan_items",
                 "compact_plans",
@@ -97,6 +98,7 @@ def reset_seed(db_path: str | None = None) -> None:
     with get_db(db_path) as conn:
         for table in (
             "volume_reports",
+            "gate_checks",
             "rewrite_jobs",
             "plan_items",
             "compact_plans",

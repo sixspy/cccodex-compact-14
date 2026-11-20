@@ -15,14 +15,16 @@ export async function renderFiles(view, setMsg) {
     </section>
     <section class="wall" style="margin-top:1rem">
       ${(j.stats || []).map(s => `<article class="card"><h3>${s.table_name}</h3>
-        <p>文件 ${s.file_count} · 碎文件 ${s.loose_count}</p>
+        <p>文件 ${s.file_count} · 碎文件 ${s.loose_count} · 被拒 ${s.rejected_count || 0}</p>
         <p class="muted">${s.total_bytes} 字节</p></article>`).join('')}
     </section>
     <section class="wall" style="margin-top:1rem">
-      ${(j.items || []).map(f => `<article class="card">
+      ${(j.items || []).map(f => `<article class="card" data-file="${f.id}">
         <h3>${f.path}</h3>
         <span class="tag">${f.status}</span>
+        ${f.status==='已拒绝' ? '<span class="chip chip-bad">闸检拒绝</span>' : ''}
         <p class="muted">${f.table_name} · ${f.size_bytes} 字节</p>
+        ${f.reject_reason ? `<p class="reject-reason">拒绝原因：${f.reject_reason}</p>` : ''}
         <button data-void="${f.id}" type="button" ${f.status==='已合并'?'disabled':''}>作废</button>
       </article>`).join('') || '<p class="muted">暂无文件</p>'}
     </section>`;

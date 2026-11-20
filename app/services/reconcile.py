@@ -23,7 +23,8 @@ def run_reconcile(plan_id: int, db_path: str | None = None) -> dict:
             raise ServiceError("计划不存在", 404)
         before = conn.execute(
             "SELECT COALESCE(SUM(f.size_bytes),0) AS b, COUNT(*) AS c "
-            "FROM plan_items i JOIN lake_files f ON f.id=i.file_id WHERE i.plan_id=?",
+            "FROM plan_items i JOIN lake_files f ON f.id=i.file_id "
+            "WHERE i.plan_id=? AND f.status IN ('已入计划','已合并')",
             (plan_id,),
         ).fetchone()
         job = conn.execute(

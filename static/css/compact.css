@@ -26,6 +26,13 @@ main { padding:1.2rem 1.4rem 2rem; }
 .err { color:#ff8f8f; }
 .wall { display:grid; gap:.8rem; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
 .tag { display:inline-block; padding:.15rem .45rem; border-radius:999px; background:#243049; font-size:.8rem; }
+.chip { display:inline-block; padding:.15rem .5rem; border-radius:999px; font-size:.78rem; background:#243049; border:1px solid var(--line); margin-left:.3rem; }
+.chip-ok { color:#0b2a1f; background:var(--ok); border-color:var(--ok); font-weight:600; }
+.chip-bad { color:#2a0f0f; background:var(--warn); border-color:var(--warn); font-weight:600; }
+.reject-reason { color:var(--warn); font-size:.88rem; }
+.reject-list { margin:.4rem 0 0; padding-left:1.1rem; font-size:.86rem; color:var(--text); }
+.reject-list li { margin:.2rem 0; }
+.hint { border-left:3px solid var(--accent); padding:.35rem .7rem; background:#182033; border-radius:6px; }
 label { display:grid; gap:.3rem; font-size:.9rem; color:var(--muted); }
 input, select { width:100%; padding:.5rem .6rem; border-radius:8px; border:1px solid var(--line); background:#0f1522; color:var(--text); }
 h1,h2,h3 { margin:.2rem 0 .6rem; }

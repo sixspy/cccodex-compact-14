@@ -48,6 +48,6 @@ class BaseHandler(tornado.web.RequestHandler):
     def write_error(self, status_code, **kwargs):
         err = kwargs.get("exc_info")
         if err and isinstance(err[1], ServiceError):
-            self.json({"error": err[1].message}, err[1].status_code)
+            self.json(err[1].payload(), err[1].status_code)
             return
         self.json({"error": "服务器错误"}, status_code)

@@ -16,8 +16,12 @@ export async function renderPlans(view, setMsg) {
       ${(j.items || []).map(p => `<article class="card">
         <h3>${p.plan_code}</h3>
         <span class="tag">${p.status}</span>
+        ${p.gate_status === '拒绝' ? '<span class="chip chip-bad">闸检拒绝</span>' : ''}
+        ${p.gate_status === '通过' ? '<span class="chip chip-ok">闸检通过</span>' : ''}
         <p>${p.title}</p>
         <p class="muted">${p.target_table} · ${p.item_count} 文件 · ${p.plan_bytes} 字节</p>
+        ${p.gate_status ? `<p class="muted">最近闸检 #${p.gate_check_id} · ${p.gate_threshold_kb}KB · 被拒 ${p.gate_rejected_count} 件</p>` : ''}
+        ${p.rejected_count ? `<p class="reject-reason">计划内有 ${p.rejected_count} 个低阈值被拒件</p>` : ''}
         <div class="row">
           <button data-attach="${p.id}" type="button">挂入碎文件</button>
           <button data-pub="${p.id}" class="primary" type="button">发布</button>

@@ -18,6 +18,14 @@ def update_setting(key: str, value: str, db_path: str | None = None) -> dict:
     value = (value or "").strip()
     if not key or not value:
         raise ServiceError("参数键与值不能为空")
+    if key == "compact_threshold_kb":
+        try:
+            kb = int(float(value))
+        except ValueError as exc:
+            raise ServiceError("碎文件阈值须为数字(KB)") from exc
+        if kb <= 0:
+            raise ServiceError("碎文件阈值须大于 0")
+        value = str(kb)
     with get_db(db_path) as conn:
         row = conn.execute(
             "SELECT * FROM lab_settings WHERE key=?", (key,)
